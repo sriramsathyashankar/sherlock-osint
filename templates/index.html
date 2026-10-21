@@ -1,0 +1,1646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sherlock — Digital Forensics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b0c0f;
+  --surface:#14171e;
+  --surface-2:#191d25;
+  --surface-3:#20252f;
+  --line:#2b313d;
+  --line-soft:#22262f;
+  --text:#dfe3ea;
+  --muted:#98a1b1;
+  --dim:#6b7383;
+  --brass:#e0a94a;
+  --brass-2:#f3c777;
+  --brass-soft:rgba(224,169,74,.12);
+  --brass-line:rgba(224,169,74,.34);
+  --jade:#57d9a8;
+  --jade-soft:rgba(87,217,168,.12);
+  --rust:#ef7358;
+  --rust-soft:rgba(239,115,88,.12);
+  --pixel:'Silkscreen','Fira Code',monospace;
+  --mono:'Fira Code',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --hard:3px 3px 0 rgba(0,0,0,.55);
+  --hard-sm:2px 2px 0 rgba(0,0,0,.5);
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font-family:var(--mono);font-size:13px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(900px 520px at 20% -12%,rgba(224,169,74,.07),transparent 70%),
+    radial-gradient(700px 480px at 98% 2%,rgba(87,217,168,.035),transparent 72%),
+    repeating-linear-gradient(0deg,rgba(255,255,255,.013) 0 1px,transparent 1px 4px),
+    repeating-linear-gradient(90deg,rgba(255,255,255,.013) 0 1px,transparent 1px 4px);
+}
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:60;
+  background:repeating-linear-gradient(180deg,rgba(0,0,0,.14) 0 1px,transparent 1px 3px);
+}
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
+button{cursor:pointer}
+::selection{background:rgba(224,169,74,.3)}
+::-webkit-scrollbar{width:12px;height:12px}
+::-webkit-scrollbar-thumb{background:#2b313d;border-radius:0;border:3px solid var(--bg)}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ---------- shell ---------- */
+.app{position:relative;z-index:1;display:grid;grid-template-rows:56px 1fr;height:100vh;overflow:hidden}
+.topbar{
+  display:flex;align-items:center;gap:16px;padding:0 18px;
+  background:var(--surface);border-bottom:2px solid var(--line);
+}
+.brand{display:flex;align-items:center;gap:11px;text-decoration:none;color:inherit}
+.brand .glyph{
+  width:32px;height:32px;flex:none;display:grid;place-items:center;
+  background:var(--brass-2);color:#14100a;
+  font-family:var(--pixel);font-size:13px;font-weight:700;
+  box-shadow:var(--hard-sm);
+}
+.brandtext{display:flex;flex-direction:column;line-height:1.2}
+.brand .name{font-family:var(--pixel);font-size:13px;font-weight:700;letter-spacing:.06em}
+.brand .sub{font-size:9px;color:var(--dim);letter-spacing:.2em;text-transform:uppercase;font-family:var(--pixel)}
+.topbar .spacer{flex:1}
+.runpill{
+  display:flex;align-items:center;gap:8px;max-width:320px;
+  border:2px solid var(--line);background:var(--bg);padding:5px 12px;
+  color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.dot{width:7px;height:7px;flex:none;background:var(--dim);transition:background .2s,box-shadow .2s}
+.dot.ok{background:var(--jade);box-shadow:0 0 0 3px var(--jade-soft)}
+.dot.warn{background:var(--brass);box-shadow:0 0 0 3px var(--brass-soft)}
+.newbtn{
+  display:flex;align-items:center;gap:8px;padding:8px 13px;
+  border:2px solid var(--brass);background:var(--brass-soft);color:var(--brass-2);
+  font-family:var(--pixel);font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+  box-shadow:var(--hard-sm);transition:background .16s,transform .16s,box-shadow .16s;
+}
+.newbtn:hover{background:rgba(224,169,74,.2);transform:translate(-1px,-1px);box-shadow:3px 3px 0 rgba(0,0,0,.55)}
+.newbtn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 rgba(0,0,0,.5)}
+.newbtn .plus{font-size:13px;line-height:1}
+
+.shell{display:grid;grid-template-columns:264px 1fr;min-height:0}
+.sidebar{
+  display:flex;flex-direction:column;gap:18px;min-height:0;
+  background:var(--surface);border-right:2px solid var(--line);padding:16px 14px;
+}
+.side-label{
+  font-family:var(--pixel);font-size:9px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--dim);margin-bottom:8px;padding-left:1px;
+}
+.side-nav{display:flex;flex-direction:column;gap:3px}
+.side-nav button{
+  display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  background:transparent;border:0;border-left:3px solid transparent;padding:8px 10px;color:var(--muted);
+  font-size:12.5px;transition:background .14s,color .14s,border-color .14s;
+}
+.side-nav button:hover{background:var(--surface-2);color:var(--text)}
+.side-nav button.active{background:var(--surface-3);color:var(--text);border-left-color:var(--brass)}
+.side-nav .k{width:16px;text-align:center;color:var(--dim);font-size:12px;flex:none}
+.side-nav button.active .k{color:var(--brass)}
+.history{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:2px;margin:0 -2px;padding:0 2px}
+.hitem{
+  text-align:left;background:transparent;border:0;border-left:3px solid transparent;border-radius:0;
+  padding:7px 10px;cursor:pointer;color:var(--muted);
+  display:flex;flex-direction:column;gap:1px;transition:background .14s,color .14s,border-color .14s;
+}
+.hitem:hover{background:var(--surface-2);color:var(--text);border-left-color:var(--line-2,var(--line))}
+.hitem .t{font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hitem .m{font-size:10px;color:var(--dim)}
+.empty{color:var(--dim);font-size:11.5px;padding:6px 2px;line-height:1.5}
+.side-foot{border-top:2px solid var(--line-soft);padding-top:14px;display:flex;flex-direction:column;gap:8px}
+.side-foot .row{display:flex;align-items:center;gap:9px;font-size:11px;color:var(--muted)}
+.side-foot .row span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10.5px}
+.side-foot .lbl{color:var(--dim);min-width:72px;flex:none}
+
+/* ---------- main ---------- */
+.main{display:grid;grid-template-columns:1fr 316px;min-height:0;min-width:0}
+.stage{display:flex;flex-direction:column;min-height:0;min-width:0}
+.view{display:none;flex:1;min-height:0;overflow-y:auto;padding:26px 30px}
+.view.active{display:block}
+.view.chatview.active{display:flex;flex-direction:column;padding:0;overflow:hidden}
+.view-head{max-width:940px;margin:0 auto 20px}
+.view-head h2{
+  font-family:var(--pixel);font-size:15px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  margin:0 0 10px;padding-bottom:10px;border-bottom:2px solid var(--line);
+}
+.view-head p{margin:0;color:var(--muted);font-size:12.5px;max-width:70ch}
+
+/* ---------- chat thread ---------- */
+.thread{flex:1;overflow-y:auto;padding:28px 30px 8px;scroll-behavior:smooth}
+.thread-inner{width:100%;max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+.msg{display:flex;gap:13px;max-width:880px;animation:rise .3s steps(5) both}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.msg .av{
+  flex:none;width:32px;height:32px;display:grid;place-items:center;
+  font-family:var(--pixel);font-size:11px;font-weight:700;
+  border:2px solid var(--line);background:var(--surface-2);color:var(--muted);
+}
+.msg.assistant .av{background:var(--brass-2);color:#14100a;border-color:var(--brass-2);box-shadow:var(--hard-sm)}
+.msg .body{min-width:0;flex:1}
+.msg .who{
+  font-family:var(--pixel);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+  margin-bottom:6px;
+}
+.msg .text{white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:1.72}
+.msg.user .text{
+  background:var(--surface-2);border:2px solid var(--line);border-left:3px solid var(--brass);
+  padding:9px 13px;display:inline-block;
+}
+.msg .meta{color:var(--dim);font-size:10.5px;margin-top:6px}
+
+/* greeting */
+.greet{
+  border:2px solid var(--line);background:linear-gradient(180deg,rgba(224,169,74,.07),transparent 60%),var(--surface);
+  padding:22px 24px;box-shadow:var(--hard);
+}
+.greet h1{
+  font-family:var(--pixel);font-size:19px;font-weight:700;letter-spacing:.04em;
+  margin:0 0 12px;color:var(--brass-2);
+}
+.greet p{margin:0 0 16px;color:var(--muted);font-size:12.5px;max-width:72ch;line-height:1.75}
+.greet strong{color:var(--brass-2);font-weight:400}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip-btn{
+  border:2px solid var(--line);background:var(--surface-2);color:var(--muted);
+  padding:6px 12px;font-size:11.5px;box-shadow:var(--hard-sm);
+  transition:all .14s;
+}
+.chip-btn:hover{border-color:var(--brass);color:var(--brass-2);background:var(--brass-soft);transform:translate(-1px,-1px);box-shadow:3px 3px 0 rgba(0,0,0,.55)}
+.chip-btn code{font-family:var(--mono);font-size:11px;color:var(--brass-2)}
+
+/* thinking */
+.thinking .text{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12.5px}
+.dots{display:inline-flex;gap:4px}
+.dots span{width:6px;height:6px;background:var(--brass);display:block;animation:blink 1.2s infinite steps(2,end)}
+.dots span:nth-child(2){animation-delay:.2s}
+.dots span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+
+/* ---------- composer ---------- */
+.composer-wrap{padding:8px 30px 20px;background:linear-gradient(180deg,transparent,rgba(11,12,15,.94) 38%)}
+.composer{max-width:880px;margin:0 auto}
+.composer-inner{
+  border:2px solid var(--line);background:var(--surface);box-shadow:var(--hard);
+  transition:border-color .18s,box-shadow .18s;
+}
+.composer-inner:focus-within{border-color:var(--brass);box-shadow:3px 3px 0 rgba(0,0,0,.55),0 0 0 3px var(--brass-soft)}
+.composer textarea{
+  width:100%;background:transparent;border:0;outline:none;resize:none;
+  padding:13px 15px 2px;font-size:13px;line-height:1.65;max-height:200px;
+}
+.composer textarea::placeholder{color:var(--dim)}
+.composer-bar{display:flex;align-items:center;gap:10px;padding:8px 10px 10px 13px}
+.composer-bar .spacer{flex:1}
+.modes{display:flex;gap:0;background:var(--bg);border:2px solid var(--line-soft)}
+.modes button{
+  border:0;border-right:2px solid var(--line-soft);background:transparent;color:var(--muted);
+  padding:6px 13px;font-family:var(--pixel);font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+  transition:background .14s,color .14s;
+}
+.modes button:last-child{border-right:0}
+.modes button:hover{color:var(--text)}
+.modes button.active{background:var(--brass-soft);color:var(--brass-2);box-shadow:inset 0 0 0 2px var(--brass)}
+.composer-hint{font-size:10.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+.sendbtn{
+  width:36px;height:36px;flex:none;border:0;
+  background:var(--brass-2);color:#14100a;box-shadow:var(--hard-sm);
+  display:grid;place-items:center;transition:transform .14s,box-shadow .14s,filter .14s;
+}
+.sendbtn:hover{transform:translate(-1px,-1px);box-shadow:3px 3px 0 rgba(0,0,0,.55)}
+.sendbtn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 rgba(0,0,0,.5)}
+.sendbtn:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:var(--hard-sm)}
+.sendbtn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:square;stroke-linejoin:miter}
+
+/* ---------- cards ---------- */
+.card{border:2px solid var(--line);background:var(--surface);box-shadow:var(--hard);margin-top:14px;overflow:hidden}
+.card:first-child{margin-top:0}
+.card-head{
+  display:flex;align-items:center;gap:10px;padding:10px 14px;
+  border-bottom:2px solid var(--line-soft);background:var(--surface-2);
+  font-family:var(--pixel);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+}
+.card-head .badge{
+  margin-left:auto;font-family:var(--mono);font-size:10.5px;letter-spacing:0;text-transform:none;
+  padding:2px 8px;border:2px solid var(--line);color:var(--muted);white-space:nowrap;background:var(--bg);
+}
+.card-head .case-target{font-family:var(--pixel);font-size:12px;letter-spacing:.04em;text-transform:none;color:var(--brass-2)}
+.card-body{padding:14px}
+.stage-list{display:flex;flex-direction:column;gap:6px;list-style:none;margin:0;padding:0}
+.stage-row{
+  display:flex;align-items:center;gap:12px;padding:8px 12px;
+  border:2px solid var(--line-soft);border-left:3px solid var(--brass);background:var(--bg);
+  animation:rise .26s steps(4) both;
+}
+.stage-row .idx{font-size:10.5px;color:var(--brass);flex:none;width:20px}
+.stage-row .nm{flex:1;min-width:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stage-row .rp{font-size:10.5px;color:var(--dim);flex:none;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stage-row .st{flex:none;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--jade)}
+.stage-row.failed{border-left-color:var(--rust)}
+.stage-row.failed .st{color:var(--rust)}
+.briefing{border:2px solid var(--brass-line);border-left:4px solid var(--brass);background:var(--brass-soft);padding:12px 14px;margin-bottom:14px}
+.briefing .bh{font-family:var(--pixel);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--brass);margin-bottom:7px}
+.briefing .bd{font-size:12.5px;line-height:1.75;color:var(--text)}
+.finding{padding:9px 0;border-top:1px solid var(--line-soft)}
+.finding:first-child{border-top:0}
+.finding .fc{display:flex;align-items:center;gap:9px;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);flex-wrap:wrap}
+.finding .fd{font-size:12.5px;color:var(--text);margin-top:4px;line-height:1.65}
+.tag{padding:1px 7px;border:2px solid var(--line);font-size:9.5px;letter-spacing:.06em}
+.tag.ok{color:var(--jade);border-color:rgba(87,217,168,.4);background:var(--jade-soft)}
+.tag.no{color:var(--rust);border-color:rgba(239,115,88,.4);background:var(--rust-soft)}
+.tag.part{color:var(--brass);border-color:var(--brass-line);background:var(--brass-soft)}
+.section-title{font-family:var(--pixel);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin:16px 0 8px}
+.recs{margin:0;padding-left:20px;color:var(--muted);font-size:12.5px}
+.recs li{margin:5px 0}
+
+/* ---------- panels ---------- */
+.settings,.pipeline-wrap{max-width:940px;margin:0 auto}
+.panel{border:2px solid var(--line);background:var(--surface);box-shadow:var(--hard);overflow:hidden}
+.panel-head{display:flex;align-items:center;gap:10px;padding:11px 15px;border-bottom:2px solid var(--line-soft);background:var(--surface-2)}
+.panel-head h3{margin:0;font-family:var(--pixel);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.panel-head .badge{margin-left:auto;font-size:10.5px;color:var(--dim)}
+.panel-body{padding:15px}
+.field{margin-bottom:14px}
+.field label{display:block;font-family:var(--pixel);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+input[type=text],input[type=password],select,textarea.input{
+  width:100%;background:var(--bg);border:2px solid var(--line);padding:8px 11px;font-size:12.5px;
+  outline:none;transition:border-color .16s,box-shadow .16s;
+}
+input:focus,select:focus{border-color:var(--brass);box-shadow:0 0 0 3px var(--brass-soft)}
+select{appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2398a1b1' stroke-width='2'><path d='M6 9l6 6 6-6'/></svg>");background-repeat:no-repeat;background-position:right 9px center;background-size:14px;padding-right:30px}
+.hint{font-size:11px;color:var(--dim);margin-top:7px;line-height:1.6}
+.hint code{font-size:10.5px;color:var(--muted)}
+.tip{font-size:11.5px;color:var(--dim);border-left:3px solid var(--line);padding-left:11px;margin-top:12px;line-height:1.6}
+.btn{
+  border:2px solid var(--line);background:var(--surface-2);color:var(--text);
+  padding:7px 13px;font-size:12px;box-shadow:var(--hard-sm);white-space:nowrap;
+  transition:transform .14s,box-shadow .14s,background .14s,border-color .14s;
+}
+.btn:hover{background:var(--surface-3);transform:translate(-1px,-1px);box-shadow:3px 3px 0 rgba(0,0,0,.55)}
+.btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 rgba(0,0,0,.5)}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:var(--hard-sm)}
+.btn.primary{background:var(--brass-2);color:#14100a;border-color:var(--brass-2);font-weight:600}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent;color:var(--muted)}
+.btn.ghost:hover{color:var(--rust);border-color:rgba(239,115,88,.5);background:var(--rust-soft)}
+.alert{display:none;border:2px solid var(--line);background:var(--surface-2);color:var(--muted);padding:9px 12px;font-size:11.5px;margin-top:11px}
+.alert.show{display:block;animation:rise .22s steps(4) both}
+.alert.ok{color:var(--jade);border-color:rgba(87,217,168,.4);background:var(--jade-soft)}
+.alert.err{color:var(--rust);border-color:rgba(239,115,88,.4);background:var(--rust-soft)}
+.steps{display:flex;flex-direction:column;gap:18px}
+.step{display:flex;gap:13px}
+.step .num{
+  flex:none;width:28px;height:28px;display:grid;place-items:center;
+  border:2px solid var(--line);background:var(--surface-2);color:var(--muted);font-size:12px;transition:all .2s;
+}
+.step.done .num{background:var(--jade-soft);border-color:rgba(87,217,168,.5);color:var(--jade)}
+.step .lbl{font-family:var(--pixel);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:9px}
+.step>div{flex:1;min-width:0}
+.saved-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.chip{font-size:11px;background:var(--bg);border:2px solid var(--line);padding:2px 8px;color:var(--brass-2)}
+.cselect{width:auto;min-width:126px;background:var(--bg);border:2px solid var(--line);padding:7px 28px 7px 10px;font-size:12px;appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2398a1b1' stroke-width='2'><path d='M6 9l6 6 6-6'/></svg>");background-repeat:no-repeat;background-position:right 8px center;background-size:13px;cursor:pointer}
+.cselect:focus{outline:none;border-color:var(--brass)}
+.ghsearch{display:grid;grid-template-columns:1fr auto auto;gap:9px;margin-bottom:14px}
+.ghrow{
+  display:flex;align-items:flex-start;gap:14px;padding:12px 13px;border:2px solid var(--line-soft);
+  background:var(--bg);margin-bottom:9px;transition:border-color .16s,background .16s;
+}
+.ghrow:hover{border-color:var(--line);background:var(--surface-2)}
+.ghrow .body{flex:1;min-width:0}
+.ghrow .nm{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px}
+.ghrow .nm b{font-weight:600}
+.ghrow .ds{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.55}
+.ghrow .meta{display:flex;gap:10px;flex-wrap:wrap;font-size:10.5px;color:var(--dim);margin-top:6px;align-items:center}
+.ghrow .acts{flex:none;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.ghstate{font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;border:2px solid var(--line);padding:1px 7px;color:var(--muted)}
+.ghstate.ready,.ghstate.installed{color:var(--jade);border-color:rgba(87,217,168,.4);background:var(--jade-soft)}
+.ghstate.failed{color:var(--rust);border-color:rgba(239,115,88,.4);background:var(--rust-soft)}
+.ghrow input.args{background:var(--surface-2);border:2px solid var(--line);padding:4px 9px;font-size:11px;min-width:170px;flex:1;outline:none}
+.ghrow input.args:focus{border-color:var(--brass)}
+
+/* ---------- pipeline ---------- */
+.stagerow{display:flex;align-items:center;gap:14px;padding:10px 13px;border:2px solid var(--line-soft);border-left:3px solid var(--brass);background:var(--bg);margin-bottom:8px}
+.stagerow .nm{flex:1;min-width:0}
+.stagerow .nm .t{font-size:12.5px}
+.stagerow .nm .s{font-size:10px;color:var(--dim)}
+
+/* ---------- rail ---------- */
+.rail{border-left:2px solid var(--line);background:var(--surface);padding:16px 14px;overflow-y:auto;display:flex;flex-direction:column;gap:20px;min-height:0}
+.rail-sec h4{margin:0 0 9px;font-family:var(--pixel);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.kv{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:4px 0;font-size:12px;border-bottom:1px solid var(--line-soft)}
+.kv:last-child{border-bottom:0}
+.kv .k{color:var(--dim);font-size:10.5px;letter-spacing:.04em}
+.kv .v{font-size:11px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:58%;text-align:right}
+
+/* ---------- spinner ---------- */
+.spinner{display:inline-block;width:11px;height:11px;vertical-align:-1px;border:2px solid var(--line);border-top-color:var(--brass);animation:spin .7s steps(8) infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---------- responsive ---------- */
+@media (max-width:1180px){
+  .main{grid-template-columns:1fr 264px}
+}
+@media (max-width:980px){
+  .shell{grid-template-columns:1fr}
+  .sidebar,.rail{display:none}
+  .thread{padding:20px 16px 6px}
+  .composer-wrap{padding:6px 16px 16px}
+  .ghsearch{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
+  .thread{scroll-behavior:auto}
+}
+
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="glyph">SH</span>
+      <span class="brandtext">
+        <span class="name">Sherlock</span>
+        <span class="sub">221B · digital forensics</span>
+      </span>
+    </div>
+    <div class="spacer"></div>
+    <div class="runpill" id="runpill" title="Active model">
+      <span class="dot" id="modelDot"></span>
+      <span id="modelLabel">no model configured</span>
+    </div>
+    <button class="newbtn" id="newBtn"><span class="plus">+</span> New case</button>
+  </header>
+
+  <div class="shell">
+    <aside class="sidebar">
+      <div>
+        <div class="side-label">Workspace</div>
+        <nav class="side-nav" id="sideNav">
+          <button data-view="chat" class="active"><span class="k">☰</span> Consult</button>
+          <button data-view="pipeline"><span class="k">▤</span> Pipeline</button>
+          <button data-view="results"><span class="k">▦</span> Dossier</button>
+          <button data-view="repos"><span class="k">⌘</span> Arsenal</button>
+          <button data-view="settings"><span class="k">⚙</span> Settings</button>
+        </nav>
+      </div>
+
+      <div style="display:flex;flex-direction:column;min-height:0;flex:1">
+        <div class="side-label">Case history</div>
+        <div class="history" id="history"></div>
+      </div>
+
+      <div class="side-foot">
+        <div class="row"><span class="dot" id="sideDot"></span><span id="sideModel">No provider configured</span></div>
+        <div class="row"><span class="lbl">OSINT tools</span><span id="repoCount">—</span></div>
+        <div class="row"><span class="lbl">GitHub</span><span id="ghSideStatus">no token</span></div>
+      </div>
+    </aside>
+
+    <div class="main">
+      <div class="stage">
+        <!-- chat -->
+        <section class="view chatview active" id="view-chat">
+          <div class="thread" id="thread">
+            <div class="thread-inner" id="threadInner"></div>
+          </div>
+          <div class="composer-wrap">
+            <form class="composer" id="composer">
+              <div class="composer-inner">
+                <textarea id="target" rows="1"
+                  placeholder="Speak to Sherlock — ask him anything, or tell him to open a case…"
+                  autocomplete="off"></textarea>
+                <div class="composer-bar">
+                  <div class="modes" id="modes">
+                    <button type="button" class="active" data-mode="chat">Chat</button>
+                    <button type="button" data-mode="investigate">Investigate</button>
+                  </div>
+                  <span id="typeWrap" hidden>
+                    <select class="cselect" id="targetType">
+                      <option value="username">username</option>
+                      <option value="email">email</option>
+                      <option value="name">name</option>
+                      <option value="comprehensive">comprehensive</option>
+                    </select>
+                  </span>
+                  <div class="spacer"></div>
+                  <span class="composer-hint" id="hintModel">model: unset</span>
+                  <button class="sendbtn" id="sendBtn" type="submit" aria-label="Send">
+                    <svg viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <!-- pipeline -->
+        <section class="view" id="view-pipeline">
+          <div class="view-head">
+            <h2>Pipeline</h2>
+            <p>Each stage runs in prerequisite order. Choose which tool serves each stage — the repositories you download in the Arsenal appear here too.</p>
+          </div>
+          <div class="pipeline-wrap">
+            <div class="panel">
+              <div class="panel-head">
+                <h3>Stage assignment</h3>
+                <select class="cselect" id="pipeType" style="margin-left:auto"></select>
+              </div>
+              <div class="panel-body">
+                <div id="pipeTools"><div class="empty">Loading tools…</div></div>
+                <div class="tip">Downloaded GitHub repositories appear here next to the built-in integrations.</div>
+              </div>
+            </div>
+            <div id="pipelineContent" style="margin-top:16px"><div class="empty">Run an investigation to populate the pipeline.</div></div>
+          </div>
+        </section>
+
+        <!-- results -->
+        <section class="view" id="view-results">
+          <div class="view-head">
+            <h2>Dossier</h2>
+            <p>The stitched report for the most recent case: what was confirmed, what could not be verified, and the next step worth taking.</p>
+          </div>
+          <div id="resultsContent"><div class="empty">No report yet. Ask Sherlock to open a case.</div></div>
+        </section>
+
+        <!-- repos -->
+        <section class="view" id="view-repos">
+          <div class="view-head">
+            <h2>Arsenal</h2>
+            <p>Bring your own tools. Add a GitHub token, search the repositories you own, download the ones you want and Sherlock configures each one by itself.</p>
+          </div>
+
+          <div class="settings">
+            <div class="panel">
+              <div class="panel-head">
+                <h3>1 · GitHub token</h3>
+                <span class="badge" id="ghBadge">not set</span>
+              </div>
+              <div class="panel-body">
+                <div class="field">
+                  <label for="ghToken">Personal access token</label>
+                  <input id="ghToken" type="password" placeholder="ghp_… or github_pat_…" autocomplete="off" spellcheck="false">
+                  <div class="hint">Stored in models/github.json with 0600 permissions and never returned by the API. A classic token needs the <code>repo</code> scope for private repositories; a fine-grained token needs read access to repository contents. Public search works without a token (10 requests/minute).</div>
+                </div>
+                <div style="display:flex;gap:9px;flex-wrap:wrap">
+                  <button class="btn primary" id="ghTokenSave" type="button">Save token</button>
+                  <button class="btn ghost" id="ghTokenClear" type="button">Remove token</button>
+                </div>
+                <div class="alert" id="ghTokenAlert"></div>
+              </div>
+            </div>
+
+            <div class="panel" style="margin-top:14px">
+              <div class="panel-head">
+                <h3>2 · Repository search</h3>
+                <span class="badge" id="ghSearchBadge">anonymous · 10 requests/minute</span>
+              </div>
+              <div class="panel-body">
+                <div class="ghsearch">
+                  <input id="ghQuery" placeholder="search repositories — e.g. osint username finder" autocomplete="off" spellcheck="false">
+                  <select class="cselect" id="ghScope">
+                    <option value="public">All of GitHub</option>
+                    <option value="mine">My repositories</option>
+                  </select>
+                  <button class="btn" id="ghSearchBtn" type="button">Search</button>
+                </div>
+                <div id="ghResults"><div class="empty">Search for a repository to download it.</div></div>
+              </div>
+            </div>
+
+            <div class="panel" style="margin-top:14px">
+              <div class="panel-head">
+                <h3>3 · Installed tools</h3>
+                <span class="badge" id="ghInstalledCount">0</span>
+              </div>
+              <div class="panel-body">
+                <div id="ghInstalled"><div class="empty">No repositories downloaded yet.</div></div>
+                <div class="tip" id="ghReposDir"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- settings -->
+        <section class="view" id="view-settings">
+          <div class="view-head">
+            <h2>Settings</h2>
+            <p>Add a key first. Sherlock validates it against the provider, lists the models it can actually use, then lets you pick one.</p>
+          </div>
+
+          <div class="settings">
+            <div class="panel">
+              <div class="panel-head">
+                <h3>Provider connection</h3>
+                <span class="badge" id="cfgBadge">not configured</span>
+              </div>
+              <div class="panel-body">
+                <div class="steps">
+                  <div class="step" id="step1">
+                    <div class="num">1</div>
+                    <div>
+                      <div class="lbl">Provider</div>
+                      <div class="field" style="margin-bottom:0">
+                        <select id="providerSelect"></select>
+                        <div class="hint" id="providerHint">Choose the API you want Sherlock to use.</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="step" id="step2">
+                    <div class="num">2</div>
+                    <div>
+                      <div class="lbl">Credentials</div>
+                      <div class="field" id="keyField">
+                        <label for="apiKey">API key</label>
+                        <input id="apiKey" type="password" placeholder="paste your API key" autocomplete="off" spellcheck="false">
+                        <div class="hint" id="keyHint">Stored locally in models/config.json with 0600 permissions. Never sent anywhere except the provider.</div>
+                      </div>
+                      <div class="field" id="baseField" style="display:none">
+                        <label for="baseUrl">Base URL</label>
+                        <input id="baseUrl" type="text" placeholder="http://127.0.0.1:11434" spellcheck="false">
+                      </div>
+                      <button class="btn" id="verifyBtn" type="button">Verify key &amp; load models</button>
+                      <div class="alert" id="verifyAlert"></div>
+                    </div>
+                  </div>
+
+                  <div class="step" id="step3">
+                    <div class="num">3</div>
+                    <div>
+                      <div class="lbl">Model</div>
+                      <div class="field">
+                        <select id="modelSelect" disabled>
+                          <option value="">Verify a key to load models…</option>
+                        </select>
+                        <div class="hint" id="modelHint">Models appear after the key is verified.</div>
+                      </div>
+                      <button class="btn primary" id="saveBtn" type="button" disabled>Save configuration</button>
+                      <div class="alert" id="saveAlert"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel" style="margin-top:14px">
+              <div class="panel-head"><h3>Active configuration</h3></div>
+              <div class="panel-body">
+                <div class="saved-row" id="savedRow">
+                  <span>No provider configured yet.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- right rail -->
+      <aside class="rail">
+        <div class="rail-sec">
+          <h4>Current case</h4>
+          <div id="railRun"><div class="empty">Nothing running.</div></div>
+        </div>
+        <div class="rail-sec">
+          <h4>Model</h4>
+          <div id="railModel"><div class="empty">No model configured.</div></div>
+        </div>
+        <div class="rail-sec">
+          <h4>Subject</h4>
+          <div id="railTarget"><div class="empty">No target yet.</div></div>
+        </div>
+        <div class="rail-sec">
+          <h4>Recent</h4>
+          <div id="railRecent"><div class="empty">No investigations.</div></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ----------------------------- helpers ----------------------------- */
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+
+async function api(path, options) {
+  const res = await fetch(path, options);
+  let body = null;
+  try { body = await res.json(); } catch (_) {}
+  if (!res.ok) throw new Error((body && (body.error || body.message)) || `HTTP ${res.status}`);
+  return body;
+}
+
+const state = {
+  providers: [],
+  models: [],
+  config: { provider: null, model: null, has_key: false, base_url: null },
+  currentRun: null,
+  history: JSON.parse(localStorage.getItem('sherlock.history') || '[]'),
+  chat: JSON.parse(localStorage.getItem('sherlock.chat') || '[]'),
+  mode: 'chat',
+  busy: false,
+  gh: { hasToken: false, login: null, repos: [], results: [], rate: null, reposDir: '', searched: false },
+  tools: [],
+  pipeTypes: {},
+  pipeType: 'username',
+};
+
+function providerLabel(id) {
+  const p = state.providers.find(x => x.id === id);
+  return p ? p.label : (id || '—');
+}
+
+function saveHistory() {
+  localStorage.setItem('sherlock.history', JSON.stringify(state.history.slice(0, 30)));
+}
+
+function saveChat() {
+  localStorage.setItem('sherlock.chat', JSON.stringify(state.chat.slice(-40)));
+}
+
+/* ----------------------------- views ----------------------------- */
+function switchView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const view = $('view-' + name);
+  if (view) view.classList.add('active');
+  document.querySelectorAll('#sideNav button').forEach(b => b.classList.toggle('active', b.dataset.view === name));
+  if (name === 'repos') { loadGithubStatus(); loadPipelineTools(); }
+  if (name === 'pipeline') loadPipelineTools();
+}
+
+document.querySelectorAll('#sideNav button').forEach(btn => {
+  btn.addEventListener('click', () => switchView(btn.dataset.view));
+});
+
+/* ----------------------------- history ----------------------------- */
+function renderHistory() {
+  const box = $('history');
+  if (!state.history.length) {
+    box.innerHTML = '<div class="empty">Cases you open appear here.</div>';
+  } else {
+    box.innerHTML = state.history.map((h, i) => `
+      <button class="hitem" data-i="${i}" title="${esc(h.target)} · ${esc(h.type)}">
+        <span class="t">${esc(h.target)}</span>
+        <span class="m">${esc(h.type)} · ${(h.pipeline_stages || []).length} stages</span>
+      </button>`).join('');
+    box.querySelectorAll('.hitem').forEach(el => {
+      el.addEventListener('click', () => {
+        const run = state.history[Number(el.dataset.i)];
+        if (run) { state.currentRun = run; renderPipeline(); renderResults(); renderRail(); switchView('results'); }
+      });
+    });
+  }
+
+  const recent = $('railRecent');
+  recent.innerHTML = state.history.length
+    ? state.history.slice(0, 5).map(h => `<div class="kv"><span class="k">${esc(h.target).slice(0,18)}</span><span class="v" style="color:var(--dim)">${esc(h.type)}</span></div>`).join('')
+    : '<div class="empty">No investigations.</div>';
+}
+
+/* ----------------------------- thread ----------------------------- */
+function threadRoot() { return $('threadInner'); }
+
+function scrollThread() {
+  const t = $('thread');
+  t.scrollTop = t.scrollHeight;
+}
+
+function pushMessage(role, text) {
+  const el = document.createElement('div');
+  el.className = 'msg ' + role;
+  el.innerHTML = `<div class="av">${role === 'user' ? 'YOU' : 'SH'}</div>
+    <div class="body"><div class="who">${role === 'user' ? 'you' : 'sherlock'}</div>
+    <div class="text">${text}</div></div>`;
+  threadRoot().appendChild(el);
+  scrollThread();
+  return el;
+}
+
+function pushAssistantCard(html) {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg assistant';
+  wrap.innerHTML = `<div class="av">SH</div><div class="body">
+    <div class="who">sherlock</div>${html}</div>`;
+  threadRoot().appendChild(wrap);
+  scrollThread();
+  return wrap;
+}
+
+function showThinking(label) {
+  const el = document.createElement('div');
+  el.className = 'msg assistant thinking';
+  el.id = 'thinking';
+  el.innerHTML = `<div class="av">SH</div>
+    <div class="body"><div class="who">sherlock</div>
+      <div class="text"><span class="dots"><span></span><span></span><span></span></span>
+      <span>${esc(label)}</span></div></div>`;
+  threadRoot().appendChild(el);
+  scrollThread();
+  return el;
+}
+
+function clearThinking() {
+  const el = $('thinking');
+  if (el) el.remove();
+}
+
+function setThinkingLabel(el, text) {
+  if (!el) return;
+  const label = el.querySelector('.tlabel');
+  if (label) label.textContent = text;
+}
+
+function pushLive() {
+  const el = document.createElement('div');
+  el.className = 'msg assistant live';
+  el.id = 'liveReply';
+  el.innerHTML = `<div class="av">SH</div>
+    <div class="body"><div class="who">sherlock</div><div class="text"></div></div>`;
+  threadRoot().appendChild(el);
+  scrollThread();
+  return el;
+}
+
+function setLiveText(el, text) {
+  if (!el) return;
+  const body = el.querySelector('.text');
+  if (body) body.textContent = text;
+  scrollThread();
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function statusTag(status) {
+  const s = String(status || '').toLowerCase();
+  if (s.includes('confirmed') || s === 'completed' || s === 'ok') return '<span class="tag ok">' + esc(status) + '</span>';
+  if (s.includes('not found') || s.includes('not performed') || s === 'failed' || s.includes('no ')) return '<span class="tag no">' + esc(status) + '</span>';
+  return '<span class="tag part">' + esc(status) + '</span>';
+}
+
+function stageRows(stages) {
+  return stages.map((s, i) => `
+    <li class="stage-row ${String(s.status || '').toLowerCase() === 'failed' ? 'failed' : 'done'}" style="animation-delay:${i * 45}ms">
+      <span class="idx">${String(i + 1).padStart(2, '0')}</span>
+      <span class="nm">${esc(s.name)}</span>
+      <span class="rp">${esc(s.repo_used || '')}</span>
+      <span class="st">${esc(s.status || 'done')}</span>
+    </li>`).join('');
+}
+
+function reportCard(report, run) {
+  const narrative = report.narrative
+    ? `<div class="briefing"><div class="bh">Case briefing${report.narrative_model ? ' · ' + esc(report.narrative_model) : ''}</div>
+       <div class="bd">${esc(report.narrative)}</div></div>`
+    : '';
+  const findings = (report.findings || []).map(f => `
+    <div class="finding">
+      <div class="fc">${esc(f.category)} ${statusTag(f.status)}</div>
+      <div class="fd">${esc(f.detail)}</div>
+    </div>`).join('');
+  const recs = report.recommendations || [];
+  const recHtml = recs.length
+    ? `<div class="section-title">Next steps</div><ul class="recs">${recs.map(r => `<li>${esc(r)}</li>`).join('')}</ul>`
+    : '';
+  const badge = run
+    ? `${esc(run.target)} · ${esc(run.type)}`
+    : `${(report.findings || []).length} findings`;
+  return `
+    <div class="card">
+      <div class="card-head">Dossier<span class="badge">${badge}</span></div>
+      <div class="card-body">${narrative}${findings || '<div class="empty">No findings.</div>'}${recHtml}</div>
+    </div>`;
+}
+
+function runCard(run) {
+  const stages = run.pipeline_stages || [];
+  return `
+    <div class="card">
+      <div class="card-head"><span class="case-target">${esc(run.target)}</span>
+        <span class="badge">${esc(run.type)} · ${stages.length} stages</span></div>
+      <div class="card-body">
+        <ol class="stage-list">${stageRows(stages)}</ol>
+      </div>
+    </div>
+    ${reportCard(run.report || {}, run)}`;
+}
+
+/* ----------------------------- pipeline / results views ----------------------------- */
+function renderPipeline() {
+  const box = $('pipelineContent');
+  const run = state.currentRun;
+  if (!run || !(run.pipeline_stages || []).length) {
+    box.innerHTML = '<div class="empty">Run an investigation to populate the pipeline.</div>';
+    return;
+  }
+  box.innerHTML = `
+    <div class="card">
+      <div class="card-head"><span class="case-target">${esc(run.target)}</span>
+        <span class="badge">prerequisite order</span></div>
+      <div class="card-body"><ol class="stage-list">${stageRows(run.pipeline_stages)}</ol></div>
+    </div>`;
+}
+
+function renderResults() {
+  const box = $('resultsContent');
+  const run = state.currentRun;
+  if (!run || !run.report) {
+    box.innerHTML = '<div class="empty">No report yet. Ask Sherlock to open a case.</div>';
+    return;
+  }
+  box.innerHTML = reportCard(run.report, run);
+}
+
+/* ----------------------------- rail ----------------------------- */
+function renderRail() {
+  const run = state.currentRun;
+  $('railRun').innerHTML = run
+    ? `<div class="kv"><span class="k">target</span><span class="v">${esc(run.target)}</span></div>
+       <div class="kv"><span class="k">type</span><span class="v">${esc(run.type)}</span></div>
+       <div class="kv"><span class="k">stages</span><span class="v">${(run.pipeline_stages || []).length}</span></div>
+       <div class="kv"><span class="k">findings</span><span class="v">${((run.report && run.report.findings) || []).length}</span></div>`
+    : '<div class="empty">Nothing running.</div>';
+
+  $('railTarget').innerHTML = run
+    ? `<div class="kv"><span class="k">subject</span><span class="v">${esc(run.target)}</span></div>`
+    : '<div class="empty">No target yet.</div>';
+
+  const cfg = state.config;
+  $('railModel').innerHTML = cfg.provider
+    ? `<div class="kv"><span class="k">provider</span><span class="v">${esc(providerLabel(cfg.provider))}</span></div>
+       <div class="kv"><span class="k">model</span><span class="v">${esc(cfg.model || '—')}</span></div>
+       <div class="kv"><span class="k">key</span><span class="v">${cfg.has_key ? 'stored' : 'not stored'}</span></div>`
+    : '<div class="empty">No model configured.</div>';
+}
+
+function renderModelStatus() {
+  const cfg = state.config;
+  const dot = $('modelDot');
+  const sidebarDot = $('sideDot');
+  if (cfg.provider && cfg.model) {
+    $('modelLabel').textContent = providerLabel(cfg.provider) + ' · ' + cfg.model;
+    $('sideModel').textContent = providerLabel(cfg.provider) + ' · ' + cfg.model;
+    dot.className = 'dot ok'; sidebarDot.className = 'dot ok';
+    $('hintModel').textContent = 'model: ' + cfg.model;
+  } else if (cfg.provider) {
+    $('modelLabel').textContent = providerLabel(cfg.provider) + ' · no model';
+    $('sideModel').textContent = providerLabel(cfg.provider) + ' · no model';
+    dot.className = 'dot warn'; sidebarDot.className = 'dot warn';
+    $('hintModel').textContent = 'model: unset';
+  } else {
+    $('modelLabel').textContent = 'no model configured';
+    $('sideModel').textContent = 'No provider configured';
+    dot.className = 'dot'; sidebarDot.className = 'dot';
+    $('hintModel').textContent = 'model: unset';
+  }
+  $('cfgBadge').textContent = cfg.model ? (cfg.model) : (cfg.provider ? 'provider set, model missing' : 'not configured');
+}
+
+/* ----------------------------- settings flow ----------------------------- */
+function setAlert(el, kind, message) {
+  el.className = 'alert show ' + kind;
+  el.innerHTML = message;
+}
+function clearAlert(el) { el.className = 'alert'; el.innerHTML = ''; }
+
+function renderProviders() {
+  const sel = $('providerSelect');
+  sel.innerHTML = '<option value="">Select a provider…</option>' +
+    state.providers.map(p => `<option value="${esc(p.id)}">${esc(p.label)}</option>`).join('');
+  if (state.config.provider) sel.value = state.config.provider;
+  applyProviderUi();
+}
+
+function applyProviderUi() {
+  const id = $('providerSelect').value;
+  const p = state.providers.find(x => x.id === id);
+  const baseField = $('baseField');
+  const keyField = $('keyField');
+
+  if (!p) {
+    baseField.style.display = 'none';
+    keyField.style.display = '';
+    $('providerHint').textContent = 'Choose the API you want Sherlock to use.';
+    $('apiKey').placeholder = 'paste your API key';
+    return;
+  }
+
+  baseField.style.display = p.editable_base ? '' : 'none';
+  if (p.editable_base) {
+    $('baseUrl').value = state.config.base_url || p.default_base || '';
+    $('baseUrl').placeholder = p.default_base || 'http://127.0.0.1:11434/v1';
+  }
+  keyField.style.display = p.keyless ? 'none' : '';
+
+  const keyLabel = document.querySelector('#keyField label');
+  if (keyLabel) keyLabel.textContent = p.key_required ? 'API key' : 'API key (optional)';
+
+  $('providerHint').textContent = p.keyless
+    ? 'Local runtime — no key needed. Make sure the server is running.'
+    : p.key_required
+      ? `Models are read from ${p.label} using the key you provide.`
+      : 'Endpoint mode — paste the server URL and no key is needed. You can also paste the URL into the key box.';
+  $('apiKey').placeholder = p.keyless ? '' : (p.key_required ? `paste your ${p.label} API key` : 'optional — or paste an endpoint URL here');
+}
+
+async function verifyKey() {
+  const btn = $('verifyBtn');
+  const alertEl = $('verifyAlert');
+  const provider = $('providerSelect').value;
+  const apiKey = $('apiKey').value.trim();
+  const baseUrl = $('baseUrl').value.trim();
+
+  clearAlert(alertEl);
+  if (!provider) { setAlert(alertEl, 'err', 'Select a provider first.'); return; }
+
+  const p = state.providers.find(x => x.id === provider);
+
+  // Endpoint-first: a pasted URL belongs in the base URL field.
+  let effectiveKey = apiKey;
+  let effectiveBase = baseUrl;
+  if (/^https?:\/\//i.test(apiKey)) {
+    effectiveBase = apiKey;
+    effectiveKey = '';
+    $('baseUrl').value = apiKey;
+    $('apiKey').value = '';
+    $('baseField').style.display = '';
+  }
+
+  if (p.key_required && !effectiveKey) { setAlert(alertEl, 'err', 'Enter an API key to verify.'); return; }
+  if (!p.key_required && !effectiveKey && !effectiveBase) {
+    setAlert(alertEl, 'err', 'Enter an endpoint URL, or a key for this provider.');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Checking key…';
+  $('modelSelect').disabled = true;
+  $('saveBtn').disabled = true;
+
+  try {
+    const data = await api('/api/providers/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider, apiKey: effectiveKey, baseUrl: effectiveBase }),
+    });
+    state.models = data.models || [];
+    const sel = $('modelSelect');
+    sel.innerHTML = state.models.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+    sel.disabled = false;
+    $('saveBtn').disabled = false;
+    $('step1').classList.add('done');
+    $('step2').classList.add('done');
+    $('step3').classList.add('done');
+    $('modelHint').textContent = `${state.models.length} model(s) available on ${p.label}.`;
+    setAlert(alertEl, 'ok', `Key verified. ${state.models.length} model(s) available.`);
+  } catch (err) {
+    state.models = [];
+    const sel = $('modelSelect');
+    sel.innerHTML = '<option value="">Verification failed</option>';
+    sel.disabled = true;
+    $('saveBtn').disabled = true;
+    $('step2').classList.remove('done');
+    $('step3').classList.remove('done');
+    setAlert(alertEl, 'err', esc(err.message));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Verify key & load models';
+  }
+}
+
+async function saveConfig() {
+  const alertEl = $('saveAlert');
+  clearAlert(alertEl);
+  const provider = $('providerSelect').value;
+  const model = $('modelSelect').value;
+  const baseUrl = $('baseUrl').value.trim();
+  const apiKey = $('apiKey').value.trim();
+
+  if (!provider) { setAlert(alertEl, 'err', 'Select a provider first.'); return; }
+  if (!model) { setAlert(alertEl, 'err', 'Pick a model first.'); return; }
+
+  const btn = $('saveBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Saving…';
+  try {
+    const data = await api('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider, model, baseUrl, apiKey }),
+    });
+    state.config = data.config;
+    $('apiKey').value = '';
+    renderModelStatus();
+    renderRail();
+    renderSavedRow();
+    setAlert(alertEl, 'ok', 'Configuration saved. Sherlock will use this model from now on.');
+  } catch (err) {
+    setAlert(alertEl, 'err', esc(err.message));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save configuration';
+  }
+}
+
+function renderSavedRow() {
+  const cfg = state.config;
+  const row = $('savedRow');
+  if (!cfg.provider) {
+    row.innerHTML = '<span>No provider configured yet.</span>';
+    return;
+  }
+  row.innerHTML = `
+    <span>provider</span><code class="chip">${esc(providerLabel(cfg.provider))}</code>
+    <span>model</span><code class="chip">${esc(cfg.model || '—')}</code>
+    <span>key</span><code class="chip">${cfg.has_key ? 'stored' : 'not stored'}</code>`;
+}
+
+/* ----------------------------- github repositories ----------------------------- */
+function ghMetaLine(r) {
+  const bits = [];
+  if (r.stars != null) bits.push(`★ ${r.stars}`);
+  if (r.language) bits.push(r.language);
+  if (r.updated_at) bits.push('updated ' + String(r.updated_at).slice(0, 10));
+  if (r.private) bits.push('private');
+  if (r.fork) bits.push('fork');
+  return bits.join(' · ');
+}
+
+function renderGhResults() {
+  const box = $('ghResults');
+  const list = state.gh.results;
+  if (!list.length) {
+    if (state.gh.searched) box.innerHTML = '<div class="empty">No repositories matched.</div>';
+    return;
+  }
+  // Derive the badge from what is on disk right now, so removing a repository
+  // immediately frees its "Download & configure" button again.
+  const installed = new Set((state.gh.repos || []).map(r => String(r.full_name).toLowerCase()));
+  box.innerHTML = list.map((r, i) => {
+    const isInstalled = installed.has(String(r.full_name).toLowerCase());
+    return `
+    <div class="ghrow" data-i="${i}">
+      <div class="body">
+        <div class="nm"><b>${esc(r.full_name)}</b></div>
+        ${r.description ? `<div class="ds">${esc(r.description)}</div>` : ''}
+        <div class="meta">${esc(ghMetaLine(r))}</div>
+      </div>
+      <div class="acts">
+        <button class="btn primary gh-install" data-full="${esc(r.full_name)}"
+          ${isInstalled ? 'disabled' : ''}>${isInstalled ? 'Installed' : 'Download &amp; configure'}</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  box.querySelectorAll('.gh-install').forEach(btn => {
+    btn.addEventListener('click', () => installRepo(btn));
+  });
+}
+
+function renderGhInstalled() {
+  const box = $('ghInstalled');
+  const list = state.gh.repos;
+  $('ghInstalledCount').textContent = `${list.length} tool${list.length === 1 ? '' : 's'}`;
+  if (!list.length) {
+    box.innerHTML = '<div class="empty">No repositories downloaded yet.</div>';
+    return;
+  }
+  box.innerHTML = list.map(r => `
+    <div class="ghrow" data-key="${esc(r.key)}">
+      <div class="body">
+        <div class="nm"><b>${esc(r.full_name)}</b>
+          <span class="ghstate ${esc(r.status)}">${esc(r.status)}</span>
+          <span class="ghstate">${esc(r.kind)}</span></div>
+        ${r.description ? `<div class="ds">${esc(r.description)}</div>` : ''}
+        <div class="meta">${esc(ghMetaLine(r))}${(r.types || []).length ? ' · ' + esc((r.types || []).join(', ')) : ''}</div>
+        ${r.message ? `<div class="ds" style="color:var(--dim)">${esc(r.message)}</div>` : ''}
+        <div class="meta" style="align-items:center;gap:6px">
+          <span style="color:var(--dim)">args</span>
+          <input class="args" value="${esc(r.args || '{target}')}" data-key="${esc(r.key)}" spellcheck="false">
+          <button class="btn" data-save-args="${esc(r.key)}">Save</button>
+        </div>
+        <div class="meta"><span style="color:var(--dim)">entry</span><code class="chip">${esc(r.entry || '—')}</code></div>
+      </div>
+      <div class="acts">
+        <button class="btn ghost gh-remove" data-key="${esc(r.key)}">Remove</button>
+      </div>
+    </div>`).join('');
+
+  box.querySelectorAll('[data-save-args]').forEach(btn => {
+    btn.addEventListener('click', () => saveRepoArgs(btn.dataset.saveArgs));
+  });
+  box.querySelectorAll('.gh-remove').forEach(btn => {
+    btn.addEventListener('click', () => removeRepo(btn.dataset.key));
+  });
+}
+
+function renderGhStatus() {
+  const gh = state.gh;
+  const badge = $('ghBadge');
+  if (gh.hasToken) {
+    badge.textContent = gh.login ? `connected as ${gh.login}` : 'token saved';
+    badge.style.color = 'var(--jade)';
+    $('ghSideStatus').textContent = gh.login ? gh.login : 'token saved';
+  } else {
+    badge.textContent = 'not set';
+    badge.style.color = 'var(--dim)';
+    $('ghSideStatus').textContent = 'no token';
+  }
+  if (gh.rate) {
+    const rate = gh.rate;
+    $('ghSearchBadge').textContent = `${rate.remaining}/${rate.limit} API calls left`;
+  } else {
+    $('ghSearchBadge').textContent = 'anonymous · 10 requests/minute';
+  }
+  const builtins = state.tools.filter(t => t.kind === 'builtin').length;
+  const downloads = state.gh.repos.length;
+  $('repoCount').textContent = `${builtins} integrated${downloads ? ` + ${downloads} downloaded` : ''}`;
+  if (gh.reposDir) $('ghReposDir').textContent = `Downloaded repositories live in ${gh.reposDir}`;
+}
+
+async function loadGithubStatus() {
+  try {
+    const data = await api('/api/github');
+    state.gh.hasToken = !!data.has_token;
+    state.gh.login = data.login;
+    state.gh.repos = data.repos || [];
+    state.gh.rate = data.rate;
+    state.gh.reposDir = data.repos_dir || '';
+    state.gh.tokenError = data.token_error;
+  } catch (err) {
+    console.error('github status failed', err);
+  }
+  renderGhStatus();
+  renderGhInstalled();
+  renderGhResults();
+}
+
+async function saveGithubToken() {
+  const alertEl = $('ghTokenAlert');
+  const btn = $('ghTokenSave');
+  const token = $('ghToken').value.trim();
+  clearAlert(alertEl);
+  if (!token) { setAlert(alertEl, 'err', 'Paste a token first.'); return; }
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Checking…';
+  try {
+    const data = await api('/api/github/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
+    $('ghToken').value = '';
+    state.gh.hasToken = true;
+    state.gh.login = data.login;
+    setAlert(alertEl, 'ok', `Token accepted${data.login ? ` for ${data.login}` : ''}.`);
+    await loadGithubStatus();
+  } catch (err) {
+    setAlert(alertEl, 'err', esc(err.message));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save token';
+  }
+}
+
+async function clearGithubToken() {
+  const alertEl = $('ghTokenAlert');
+  clearAlert(alertEl);
+  try {
+    await api('/api/github/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: '' }),
+    });
+    $('ghToken').value = '';
+    state.gh.hasToken = false;
+    state.gh.login = null;
+    setAlert(alertEl, 'ok', 'Token removed.');
+    await loadGithubStatus();
+  } catch (err) {
+    setAlert(alertEl, 'err', esc(err.message));
+  }
+}
+
+async function searchRepos() {
+  const btn = $('ghSearchBtn');
+  const q = $('ghQuery').value.trim();
+  const scope = $('ghScope').value;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Searching…';
+  $('ghResults').innerHTML = '<div class="empty">Searching GitHub…</div>';
+  try {
+    const data = await api(`/api/github/search?q=${encodeURIComponent(q)}&scope=${encodeURIComponent(scope)}`);
+    state.gh.results = data.repos || [];
+    state.gh.searched = true;
+    $('ghSearchBadge').textContent = `${data.total} match${data.total === 1 ? '' : 'es'}`;
+    renderGhResults();
+  } catch (err) {
+    $('ghResults').innerHTML = `<div class="empty">${esc(err.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Search';
+  }
+}
+
+async function installRepo(btn) {
+  const full = btn.dataset.full;
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Downloading…';
+  try {
+    const data = await api('/api/github/install', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ full_name: full }),
+    });
+    btn.innerHTML = 'Installed';
+    await loadGithubStatus();
+    await loadPipelineTools();
+    setAlert($('ghTokenAlert'), 'ok',
+      `${full} is configured${data.repo && data.repo.entry ? ` and runs as <code>${esc(data.repo.entry)}</code>` : ''}. Assign it to a stage in the Pipeline tab.`);
+  } catch (err) {
+    btn.disabled = false;
+    btn.innerHTML = original;
+    setAlert($('ghTokenAlert'), 'err', esc(err.message));
+  }
+}
+
+async function removeRepo(key) {
+  try {
+    clearAlert($('ghTokenAlert'));
+    await api('/api/github/remove', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+    });
+    await loadGithubStatus();
+    await loadPipelineTools();
+  } catch (err) {
+    setAlert($('ghTokenAlert'), 'err', esc(err.message));
+  }
+}
+
+async function saveRepoArgs(key) {
+  const input = document.querySelector(`input.args[data-key="${CSS.escape(key)}"]`);
+  if (!input) return;
+  try {
+    await api('/api/github/args', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, args: input.value.trim() }),
+    });
+    setAlert($('ghTokenAlert'), 'ok', 'Argument pattern saved.');
+    await loadGithubStatus();
+  } catch (err) {
+    setAlert($('ghTokenAlert'), 'err', esc(err.message));
+  }
+}
+
+/* ----------------------------- pipeline tools ----------------------------- */
+async function loadPipelineTools() {
+  try {
+    const data = await api('/api/pipeline-tools');
+    state.tools = data.tools || [];
+    state.pipeTypes = data.types || {};
+  } catch (err) {
+    console.error('pipeline tools failed', err);
+    return;
+  }
+  const sel = $('pipeType');
+  if (!sel.options.length) {
+    sel.innerHTML = Object.keys(state.pipeTypes)
+      .map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+  }
+  if (state.pipeType && state.pipeTypes[state.pipeType]) sel.value = state.pipeType;
+  renderPipeTools();
+  renderGhStatus();
+}
+
+function renderPipeTools() {
+  const box = $('pipeTools');
+  const type = $('pipeType').value;
+  const stages = state.pipeTypes[type] || [];
+  if (!stages.length) {
+    box.innerHTML = '<div class="empty">No stages for this investigation type.</div>';
+    return;
+  }
+  const options = state.tools.map(t => {
+    const label = t.kind === 'user'
+      ? `${t.name} (downloaded${t.status === 'failed' ? ' · failed' : ''})`
+      : t.name;
+    return `<option value="${esc(t.key)}">${esc(label)}</option>`;
+  }).join('');
+
+  box.innerHTML = stages.map(s => `
+    <div class="stagerow">
+      <div class="nm">
+        <div class="t">${esc(s.name)}</div>
+        <div class="s">${esc(s.id)} · ${esc(s.type)}</div>
+      </div>
+      <select data-stage="${esc(s.id)}" ${s.uses_tool ? '' : 'disabled'}>
+        <option value="">${s.uses_tool ? '— no tool —' : 'not applicable'}</option>
+        ${options}
+      </select>
+    </div>`).join('');
+
+  box.querySelectorAll('select').forEach(sel => {
+    const stage = stages.find(s => s.id === sel.dataset.stage);
+    if (stage && stage.tool) sel.value = stage.tool;
+    sel.addEventListener('change', async () => {
+      try {
+        await api('/api/pipeline-tools', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type, stage_id: sel.dataset.stage, tool: sel.value }),
+        });
+        state.pipeTypes[type] = state.pipeTypes[type].map(s =>
+          s.id === sel.dataset.stage ? { ...s, tool: sel.value || null } : s);
+        setAlert($('ghTokenAlert'), 'ok',
+          `${sel.dataset.stage} now uses ${sel.options[sel.selectedIndex].text}.`);
+      } catch (err) {
+        setAlert($('ghTokenAlert'), 'err', esc(err.message));
+      }
+    });
+  });
+}
+
+/* ----------------------------- the conversation ----------------------------- */
+function addChat(role, content) {
+  state.chat.push({ role, content });
+  if (state.chat.length > 40) state.chat = state.chat.slice(-40);
+  saveChat();
+}
+
+function chatHistory() {
+  return state.chat.slice(-12).map(m => ({ role: m.role, content: m.content }));
+}
+
+function greeting() {
+  const el = document.createElement('div');
+  el.className = 'msg assistant';
+  el.innerHTML = `<div class="av">SH</div><div class="body">
+    <div class="who">sherlock</div>
+    <div class="greet">
+      <h1>221B Baker Street</h1>
+      <p>Good to see you. I have the instruments of the trade at hand — a room of OSINT sources, a whiteboard, and a case file for every subject I open.
+         Speak to me as you would to a colleague, and I shall answer. Tell me plainly to <strong>investigate</strong> someone, and I shall open a case and go through the sources myself.</p>
+      <div class="chips">
+        <button class="chip-btn" data-say="What can you actually do?">What can you do?</button>
+        <button class="chip-btn" data-say="Investigate the username <code>torvalds</code>">Investigate a username</button>
+        <button class="chip-btn" data-say="Look into the email address <code>test@example.com</code>">Open a case on an email</button>
+        <button class="chip-btn" data-say="How do I download my own tools from GitHub?">Bring my own tools</button>
+      </div>
+    </div></div>`;
+  threadRoot().appendChild(el);
+  el.querySelectorAll('.chip-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const text = btn.dataset.say.replace(/<[^>]+>/g, '');
+      $('target').value = text;
+      autoGrow();
+      $('target').focus();
+    });
+  });
+  scrollThread();
+}
+
+function restoreChat() {
+  if (state.chat.length) {
+    state.chat.forEach(m => {
+      if (m.role === 'user') pushMessage('user', esc(m.content));
+      else pushMessage('assistant', esc(m.content));
+    });
+  } else {
+    greeting();
+  }
+}
+
+function autoGrow() {
+  const el = $('target');
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+}
+
+function setMode(mode) {
+  state.mode = mode;
+  document.querySelectorAll('#modes button').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  $('typeWrap').hidden = mode !== 'investigate';
+  $('target').placeholder = mode === 'investigate'
+    ? 'Give me a subject — a username, email address, domain or name…'
+    : 'Speak to Sherlock — ask him anything, or tell him to open a case…';
+}
+
+async function sendMessage() {
+  if (state.busy) return;
+  const input = $('target');
+  const text = input.value.trim();
+  if (!text) { input.focus(); return; }
+
+  const mode = state.mode;
+  const forcedType = mode === 'investigate' ? $('targetType').value : '';
+  // The current line is sent separately, so the history ends before it.
+  const prior = chatHistory();
+
+  input.value = '';
+  autoGrow();
+  state.busy = true;
+  const sendBtn = $('sendBtn');
+  sendBtn.disabled = true;
+
+  pushMessage('user', esc(text));
+  addChat('user', text);
+
+  const thinking = showThinking(mode === 'investigate'
+    ? 'Opening the case…' : 'Sherlock is thinking…');
+  const live = pushLive();
+
+  try {
+    const started = await api('/api/chat/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text, history: prior, mode, type: forcedType }),
+    });
+
+    // The answer is watched rather than waited for: status lines keep the
+    // reader informed and the words arrive as the model writes them.
+    let seen = 0;
+    let liveText = '';
+    let snapshot = null;
+    for (;;) {
+      snapshot = await api('/api/chat/job/' + started.job);
+      const events = snapshot.events || [];
+      for (const ev of events.slice(seen)) {
+        if (ev.type === 'status') setThinkingLabel(thinking, ev.text);
+        else if (ev.type === 'delta') {
+          liveText += ev.text;
+          setLiveText(live, liveText);
+        }
+      }
+      seen = events.length;
+      if (snapshot.status === 'done' || snapshot.status === 'error') break;
+      await sleep(900);
+    }
+
+    clearThinking();
+
+    if (snapshot.status === 'error') {
+      live.remove();
+      pushAssistantCard(`<div class="card"><div class="card-head">Something went wrong</div>
+        <div class="card-body"><div class="finding"><div class="fc">error</div>
+        <div class="fd">${esc(snapshot.error || 'The conversation failed.')}</div></div></div></div>`);
+      return;
+    }
+
+    const data = snapshot.result || {};
+    if (data.mode === 'investigate' && data.run) {
+      const run = {
+        id: Date.now(),
+        at: new Date().toISOString(),
+        target: data.target,
+        type: data.type,
+        pipeline_stages: data.run.pipeline_stages || [],
+        report: data.run.report || null,
+      };
+      state.currentRun = run;
+      state.history.unshift(run);
+      state.history = state.history.slice(0, 30);
+      saveHistory();
+      renderHistory();
+      renderPipeline();
+      renderResults();
+      renderRail();
+
+      if (data.reply) {
+        setLiveText(live, data.reply);
+        addChat('assistant', data.reply);
+      } else {
+        live.remove();
+      }
+      pushAssistantCard(runCard(run));
+    } else {
+      const reply = data.reply || liveText || '…';
+      setLiveText(live, reply);
+      addChat('assistant', reply);
+    }
+  } catch (err) {
+    clearThinking();
+    live.remove();
+    pushAssistantCard(`<div class="card"><div class="card-head">Something went wrong</div>
+      <div class="card-body"><div class="finding"><div class="fc">error</div>
+      <div class="fd">${esc(err.message)}</div></div></div></div>`);
+  } finally {
+    state.busy = false;
+    sendBtn.disabled = false;
+    input.focus();
+  }
+}
+
+/* ----------------------------- wiring ----------------------------- */
+$('composer').addEventListener('submit', (e) => {
+  e.preventDefault();
+  sendMessage();
+});
+
+$('target').addEventListener('input', autoGrow);
+$('target').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    $('composer').requestSubmit();
+  }
+});
+
+document.querySelectorAll('#modes button').forEach(btn => {
+  btn.addEventListener('click', () => setMode(btn.dataset.mode));
+});
+
+$('newBtn').addEventListener('click', () => {
+  threadRoot().innerHTML = '';
+  state.chat = [];
+  saveChat();
+  state.currentRun = null;
+  switchView('chat');
+  greeting();
+  $('target').focus();
+});
+
+$('providerSelect').addEventListener('change', () => {
+  clearAlert($('verifyAlert'));
+  clearAlert($('saveAlert'));
+  applyProviderUi();
+  $('modelSelect').innerHTML = '<option value="">Verify a key to load models…</option>';
+  $('modelSelect').disabled = true;
+  $('saveBtn').disabled = true;
+});
+
+$('verifyBtn').addEventListener('click', verifyKey);
+$('saveBtn').addEventListener('click', saveConfig);
+$('apiKey').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); verifyKey(); } });
+
+$('ghTokenSave').addEventListener('click', saveGithubToken);
+$('ghTokenClear').addEventListener('click', clearGithubToken);
+$('ghSearchBtn').addEventListener('click', searchRepos);
+$('ghToken').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); saveGithubToken(); } });
+$('ghQuery').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); searchRepos(); } });
+$('ghScope').addEventListener('change', () => {
+  if ($('ghScope').value === 'mine' && !state.gh.hasToken) {
+    setAlert($('ghTokenAlert'), 'err', 'Add a GitHub token first - listing your own repositories needs one.');
+  } else {
+    clearAlert($('ghTokenAlert'));
+  }
+});
+$('pipeType').addEventListener('change', () => {
+  state.pipeType = $('pipeType').value;
+  renderPipeTools();
+});
+
+/* ----------------------------- boot ----------------------------- */
+(async function boot() {
+  try {
+    const [prov, cfg] = await Promise.all([api('/api/providers'), api('/api/config')]);
+    state.providers = prov.providers || [];
+    state.config = cfg || state.config;
+  } catch (err) {
+    console.error('boot failed', err);
+  }
+  // Restore the most recent investigation so Pipeline/Dossier survive a refresh.
+  if (state.history.length) state.currentRun = state.history[0];
+
+  renderProviders();
+  renderModelStatus();
+  renderSavedRow();
+  renderHistory();
+  renderPipeline();
+  renderResults();
+  renderRail();
+  restoreChat();
+  setMode('chat');
+
+  await loadPipelineTools();
+  await loadGithubStatus();
+
+  if (state.config.provider) {
+    applyProviderUi();
+    if (state.config.base_url) $('baseUrl').value = state.config.base_url;
+  }
+})();
+</script>
+</body>
+</html>

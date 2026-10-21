@@ -1,0 +1,25 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Secrets live here: provider keys (models/config.json) and the GitHub
+# token (models/github.json). Never commit them.
+models/
+
+# Downloaded OSINT tool checkouts
+repos/
+
+# Local UI captures
+*.png
+screenshots/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.log
+.env
+.idea/
+.vscode/
